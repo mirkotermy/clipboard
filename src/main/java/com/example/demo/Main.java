@@ -1,25 +1,27 @@
 package com.example.demo;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Scanner;
+
+import com.github.kwhat.jnativehook.keyboard.NativeKeyListener;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
-import com.google.gson.Gson;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-
-import static spark.Spark.*;
-
-public class Main {
-
-    // 1. DICHIARO la variabile, ma non la inizializzo qui.
+public class Main implements NativeKeyListener {
     private static Register registerService;
-    private static final Gson gson = new Gson();
-
+    private boolean ctrlpressed = false;
+    private String currUser;
     public static void main(String[] args) {
         // --- 1. INIZIALIZZAZIONE FIREBASE ---
         try {
-            FileInputStream serviceAccount = new FileInputStream("src/main/resources/serviceAccountKey.json");
+                InputStream serviceAccount = Main.class.getResourceAsStream("/serviceAccountKey.json");
+        if (serviceAccount == null) {
+            System.err.println("FATAL ERROR: serviceAccountKey.json not found in classpath.");
+            // ...
+            System.exit(1); // <-- Questo causa l'errore in Maven
+        }
 
             FirebaseOptions options = new FirebaseOptions.Builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -33,78 +35,68 @@ public class Main {
             System.err.println("ERRORE CRITICO: File 'serviceAccountKey.json' non trovato.");
             System.err.println("Il server non può partire senza la chiave di Firebase. Dettagli: " + e.getMessage());
             return; // Interrompe l'avvio del server
+
         }
 
-        // --- 2. INIZIALIZZO IL SERVICE ORA CHE FIREBASE E' PRONTO ---
-        registerService = new Register();
+        String loggedInUser = null;
+        Scanner scanner = new Scanner(System.in);
+        Utente user = new Utente();
+        Register reg = new Register();
+        while (loggedInUser == null) {
+            System.out.println("\n--- MENU CLIENT ---");
+            System.out.println("1. Registrati");
+            System.out.println("2. Login");
+            System.out.print("Scelta: ");
+            String choice = scanner.nextLine();
 
-        // --- 3. CONFIGURAZIONE DEL SERVER API ---
-        port(4567);
-
-        System.out.println("Server API in ascolto su http://localhost:4567");
-        // NUOVO: Log di ogni richiesta in arrivo per debug
+           switch(choice){
+                case "1":
+                    System.out.print("Inserisci username (email): ");
+                    user.setUsername(scanner.nextLine());
+                    System.out.print("Inserisci password: ");
+                    user.storedPassword(scanner.nextLine());
+                    reg.registration(user);
+                    loggedInUser =  user.getUsername();
+                    System.out.println("Benvenuto " + loggedInUser);
+                break;
+                case "2":
+                    System.out.print("Inserisci username (email): ");
+                    user.setUsername(scanner.nextLine());
+                    System.out.print("Inserisci password: ");
+                    user.storedPassword(scanner.nextLine());
+                try {
+                    reg.login(user);
+                } catch (InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                    loggedInUser =  user.getCurrUser();
+                    
+                default:
+                break;
+           }
+        }        
+        System.out.println("Benvenuto " + loggedInUser);        
+        KeyList key = new KeyList(loggedInUser);
+        key.monitorClipboard();
+        key.monitorFirebase();
+        String lastext = "";
         
-        before((request, response) -> {
-            System.out.println(">>> Richiesta ricevuta: " + request.requestMethod() + " " + request.uri());
-        });
+        // Se il login ha avuto successo, avvia il monitoraggio degli appunti
+    }
 
-        // --- ENDPOINT: Registrazione ---
-        post("/register", (request, response) -> {
-            response.type("application/json");
-            Utente user = gson.fromJson(request.body(), Utente.class);
-            registerService.registration(user);
-            return gson.toJson(new ApiResponse("success", "Registrazione tentata."));
-        });
+    //TODO: creare una classe apparte per gli eventi da tastiera che ogni volta che si preme ctrl+c salva nel database 
+    //e quando si preme ctrl + v si prende i dati dal database devo creare una classe apparte dove posso passarci username
+    // 
 
-        // --- ENDPOINT: Login ---
-        post("/login", (request, response) -> {
-            response.type("application/json");
-            Utente user = gson.fromJson(request.body(), Utente.class);
-            registerService.login(user);
-            return gson.toJson(new ApiResponse("success", "Login tentato."));
-        });
-
-        // --- ENDPOINT: Aggiunta Appunto ---
-        post("/add-note", (request, response) -> {
-            response.type("application/json");
-            NoteData noteData = gson.fromJson(request.body(), NoteData.class);
-
-            System.out.println("Nuovo appunto ricevuto dall'utente '" + noteData.getUsername() + "': " + noteData.getContent());
-
-            // Qui implementerai il salvataggio su Firebase
-
-            return gson.toJson(new ApiResponse("success", "Appunto ricevuto."));
-        });
-
-        // Gestione di endpoint non trovati
-        notFound((req, res) -> {
-            res.type("application/json");
-            return gson.toJson(new ApiResponse("error", "Endpoint non valido"));
-        });
+    public void setCurrUser(String user){
+        currUser = user;
+    
+    }
+    public String getCurrUser(){
+        return currUser;
     }
 }
 
-// --- CLASSI DI SUPPORTO PER I DATI JSON ---
 
-class ApiResponse {
-    private String status;
-    private String message;
 
-    public ApiResponse(String status, String message) {
-        this.status = status;
-        this.message = message;
-    }
-}
-
-class NoteData {
-    private String username;
-    private String content;
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getContent() {
-        return content;
-    }
-}
