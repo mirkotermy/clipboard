@@ -5,22 +5,22 @@ import java.io.InputStream;
 import java.util.Scanner;
 
 import com.github.kwhat.jnativehook.keyboard.NativeKeyListener;
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.FirebaseOptions;
+    import com.google.auth.oauth2.GoogleCredentials;
+    import com.google.firebase.FirebaseApp;
+    import com.google.firebase.FirebaseOptions;
 
-public class Main implements NativeKeyListener {
-    private static Register registerService;
-    private boolean ctrlpressed = false;
-    private String currUser;
-    public static void main(String[] args) {
-        // --- 1. INIZIALIZZAZIONE FIREBASE ---
-        try {
-                InputStream serviceAccount = Main.class.getResourceAsStream("/serviceAccountKey.json");
-        if (serviceAccount == null) {
-            System.err.println("FATAL ERROR: serviceAccountKey.json not found in classpath.");
-            // ...
-            System.exit(1); // <-- Questo causa l'errore in Maven
+    public class Main implements NativeKeyListener {
+        private static Register registerService;
+        private boolean ctrlpressed = false;
+        private String currUser;
+        public static void main(String[] args) {
+            // --- 1. INIZIALIZZAZIONE FIREBASE ---
+            try {
+                    InputStream serviceAccount = Main.class.getResourceAsStream("/serviceAccountKey.json");
+            if (serviceAccount == null) {
+                System.err.println("FATAL ERROR: serviceAccountKey.json not found in classpath.");
+                // ...
+                System.exit(1); // <-- Questo causa l'errore in Maven
         }
 
             FirebaseOptions options = new FirebaseOptions.Builder()
